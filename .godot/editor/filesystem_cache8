@@ -1,7 +1,0 @@
-ea4bc82a6ad023ab7ee23ee620429895
-::res://::1730223894
-camera_stream_texture.gd::GDScript::-1::1733859790::0::1::::<>TextureRect<>::
-icon.svg::CompressedTexture2D::2745910856807987694::1698084016::1730224728::1::::<><>::
-imagem_web.gd::GDScript::-1::1733858626::0::1::::<>Node2D<>::
-imagem_web.tscn::PackedScene::2534779024158648698::1733859790::0::1::::<><>::res://camera_stream_texture.gd
-node_2d.tscn::PackedScene::1145360181225163723::1733859790::0::1::::<><>::

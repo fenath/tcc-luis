@@ -1,7 +1,0 @@
-Button
-HTTPRequest
-VideoStreamPlayer
-Label
-TextureRect
-CollisionShape2D
-CharacterBody2D
