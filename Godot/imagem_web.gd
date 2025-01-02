@@ -2,7 +2,7 @@ extends Node2D
 
 @onready var websocket: WebSocketPeer = WebSocketPeer.new()
 
-const IP_ADDRESS: String = '192.168.1.20'
+const IP_ADDRESS: String = '192.168.1.32'
 const PORT: int = 4242
 var URL := 'ws://' + IP_ADDRESS + ":" + str(PORT)
 var last_state
@@ -60,3 +60,15 @@ func get_message() -> String:
 
 func _on_button_pressed() -> void:
 	toggle_flash()
+
+
+func _on_h_slider_value_changed(value: float) -> void:
+	# send value to flash
+	var floor_value = floor(value)
+	if floor_value > 99:
+		floor_value = 99
+	if floor_value < 0:
+		floor_value = 0
+	$sliderValue.text = str(floor_value)
+	websocket.send_text('mvx+'+str(floor_value))
+	pass # Replace with function body.
