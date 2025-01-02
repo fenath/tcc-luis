@@ -35,4 +35,19 @@ offset_right = 287.0
 offset_bottom = 122.0
 text = "Toggle flash"
 
+[node name="sliderValue" type="Label" parent="."]
+offset_left = 140.0
+offset_top = 215.0
+offset_right = 180.0
+offset_bottom = 238.0
+text = "sliderValue"
+
+[node name="HSlider" type="HSlider" parent="."]
+offset_left = 133.0
+offset_top = 169.0
+offset_right = 340.0
+offset_bottom = 185.0
+max_value = 99.0
+
 [connection signal="pressed" from="Button" to="." method="_on_button_pressed"]
+[connection signal="value_changed" from="HSlider" to="." method="_on_h_slider_value_changed"]
