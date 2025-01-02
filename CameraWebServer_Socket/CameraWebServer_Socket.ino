@@ -2,23 +2,29 @@
 #include <WiFi.h>
 #define CONFIG_HTTPD_WS_SUPPORT
 
+#define PWM_FREQ 100
+
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
 // #define CAMERA_MODEL_WROVER_KIT // Has PSRAM
 #include "camera_pins.h"
 #include <WebSocketsServer.h>
 
+
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-const char *ssid = "LIVE TIM_6034";
-const char *password = "YyAHcsCf";
+const char *ssid = "LIVE TIM_6034";//"Fernando's Galaxy A32";
+const char *password = "YyAHcsCf";//"ppzp0871";
 
 WebSocketsServer webSocket = WebSocketsServer(4242);
 
 void startCameraServer();
 void setupLedFlash(int pin);
 
+void write_pwm(int pin, int value);
+
 int flash_status = 0;
+int x_speed = 0;
 
 // Called when receiving any WebSocket message
 void onWebSocketEvent(uint8_t num,
@@ -79,6 +85,21 @@ void onWebSocketEvent(uint8_t num,
       } else if (String((char*)payload) == "command")
       {
         Serial.println("command received");
+      } else if (String((char*)payload).startsWith("mvx"))
+      {
+        // comando enviado: mvx+00, mvx+99, mvx+42, mvx-99
+        // mvx: nome do comando
+        // +,-: sentido do comando
+        // 00~99: intensidade do sinal
+        // FIXME: actually move x
+        // Por ora, vamos mandar o sinal para o flash via uma implementação de software-pwm
+        // a fim de enxergar a movimentação do flash
+
+        String nr_string = String((char*)payload).substring(4);
+        int numero = nr_string.toInt();
+
+        Serial.println("moving x: " + nr_string);
+        x_speed = numero;
       } else
       {
         webSocket.sendTXT(num, payload);
@@ -232,4 +253,30 @@ void setup() {
 void loop() {
   // Do nothing. Everything is done in another task by the web server
   webSocket.loop();
+
+  // write_pwm(LED_GPIO_NUM, x_speed);
+}
+
+
+void write_pwm(int pin, int value){
+  static unsigned long last_micros = 0;
+  static unsigned long i = 0;
+  unsigned long delta = micros() - last_micros;
+  
+  // Frequência PWM fixada em 10.000 Hz (10 kHz)
+  unsigned long period = 1000000 / 500; 
+  int prop = (value + 1) * period / 100;
+  i++;
+  if (delta >= period) {
+    last_micros = micros();
+    Serial.println(". Reseting after " + String(i) + " counts");
+    i = 0;
+  }
+
+  if (delta < prop)
+  {
+    digitalWrite(pin, HIGH);
+  } else {
+    digitalWrite(pin, LOW);
+  } 
 }
