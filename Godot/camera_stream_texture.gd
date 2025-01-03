@@ -14,7 +14,7 @@ func _ready():
 
 func request_camera_frame():
 	# URL do stream da câmera ESP32
-	var url = "http://192.168.1.20/capture"
+	var url = "http://192.168.1.32/capture"
 	http_request.request(url)
 
 func _on_image_request_completed(result, response_code, headers, body):

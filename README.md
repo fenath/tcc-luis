@@ -17,9 +17,9 @@ Há dois servidores, um responsável pelo stream do vídeo e um websocket respon
 
 # Roadmap
 
-- [ ] mvx, mvy
+- [x] mvx, mvy
 - [ ] melhora na stream pelo godot (ao acessar pelo navegador (IP:81/stream) a transmissão é muito rápida,
       mas no godot estou usando request no momento, o que torna lento
-- [ ] implementar PWM digital para poder usar valores variáveis e nao somente discretos para o robo
+- [x] implementar PWM digital para poder usar valores variáveis e nao somente discretos para o robo
       (ex: acelerar 50%, virar 80% para esquerda)
 - [ ] Montar circuito do carro

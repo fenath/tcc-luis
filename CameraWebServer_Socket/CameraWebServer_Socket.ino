@@ -22,9 +22,11 @@ void startCameraServer();
 void setupLedFlash(int pin);
 
 void write_pwm(int pin, int value);
+int extract_number(char * payload);
 
 int flash_status = 0;
 int x_speed = 0;
+int y_speed = 0;
 
 // Called when receiving any WebSocket message
 void onWebSocketEvent(uint8_t num,
@@ -95,11 +97,20 @@ void onWebSocketEvent(uint8_t num,
         // Por ora, vamos mandar o sinal para o flash via uma implementação de software-pwm
         // a fim de enxergar a movimentação do flash
 
-        String nr_string = String((char*)payload).substring(4);
-        int numero = nr_string.toInt();
+        // String nr_string = String((char*)payload).substring(4);
+        int numero = extract_number((char*)payload);
 
-        Serial.println("moving x: " + nr_string);
+        Serial.println("moving x: " + String(numero));
         x_speed = numero;
+      } else if (String((char*)payload).startsWith("mvy"))
+      {
+        // mvy: nome do comando
+        // +,-: sentido do comando
+        // 00~99: intensidade do sinal
+        // FIXME: actually move y
+        int numero = extract_number((char*)payload);
+        Serial.println("moving y: " + String(numero));
+        y_speed = numero;
       } else
       {
         webSocket.sendTXT(num, payload);
@@ -255,6 +266,7 @@ void loop() {
   webSocket.loop();
 
   // write_pwm(LED_GPIO_NUM, x_speed);
+  Serial.println("x speed: " + String(x_speed) + " | y speed: " + String(y_speed));
 }
 
 
@@ -279,4 +291,10 @@ void write_pwm(int pin, int value){
   } else {
     digitalWrite(pin, LOW);
   } 
+}
+
+int extract_number(char * payload) {
+  String nr_string = String(payload).substring(3);
+  int numero = nr_string.toInt();
+  return numero;
 }

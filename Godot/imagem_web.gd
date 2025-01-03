@@ -72,3 +72,13 @@ func _on_h_slider_value_changed(value: float) -> void:
 	$sliderValue.text = str(floor_value)
 	websocket.send_text('mvx+'+str(floor_value))
 	pass # Replace with function body.
+
+
+func _on_h_slider_2_value_changed(value: float) -> void:
+	var floor_value = floor(value)
+	if floor_value > 99:
+		floor_value = 99
+	if floor_value < 0:
+		floor_value = 0
+	$sliderValue2.text = str(floor_value)
+	websocket.send_text('mvy+'+str(floor_value))
