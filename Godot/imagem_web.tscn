@@ -1,7 +1,9 @@
-[gd_scene load_steps=3 format=3 uid="uid://bcd4o74kqdsp3"]
+[gd_scene load_steps=5 format=3 uid="uid://bcd4o74kqdsp3"]
 
 [ext_resource type="Script" path="res://camera_stream_texture.gd" id="1_4gi5t"]
 [ext_resource type="Script" path="res://imagem_web.gd" id="1_x2def"]
+[ext_resource type="Texture2D" uid="uid://dwjnu4c6sm0cb" path="res://sports_car_top_view-800x442.png" id="3_mbsv5"]
+[ext_resource type="Script" path="res://car.gd" id="3_oyu73"]
 
 [node name="ImagemWeb" type="Node2D"]
 script = ExtResource("1_x2def")
@@ -54,6 +56,7 @@ offset_left = 133.0
 offset_top = 169.0
 offset_right = 340.0
 offset_bottom = 185.0
+min_value = -99.0
 max_value = 99.0
 
 [node name="sliderValue2" type="Label" parent="."]
@@ -70,12 +73,50 @@ offset_right = 126.0
 offset_bottom = 290.0
 text = "y speed"
 
+[node name="lbCarSpeed" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 391.0
+offset_right = 126.0
+offset_bottom = 414.0
+text = "car speed: "
+
+[node name="CarSpeed" type="Label" parent="."]
+offset_left = 149.0
+offset_top = 388.0
+offset_right = 235.0
+offset_bottom = 411.0
+text = "car speed: "
+
 [node name="HSlider2" type="HSlider" parent="."]
 offset_left = 130.0
 offset_top = 271.0
 offset_right = 337.0
 offset_bottom = 287.0
+min_value = -99.0
 max_value = 99.0
+
+[node name="Car" type="Node2D" parent="."]
+position = Vector2(600, 500)
+script = ExtResource("3_oyu73")
+
+[node name="CarSprite" type="Sprite2D" parent="Car"]
+rotation = -1.5708
+scale = Vector2(0.15, 0.15)
+texture = ExtResource("3_mbsv5")
+
+[node name="TurnRadius" type="Label" parent="Car"]
+offset_left = 54.0
+offset_top = -33.0
+offset_right = 110.0
+offset_bottom = -10.0
+text = "asdkfja"
+
+[node name="TurnSpeed" type="Label" parent="Car"]
+offset_left = 54.0
+offset_top = 7.0
+offset_right = 110.0
+offset_bottom = 30.0
+text = "asdkfja"
 
 [connection signal="pressed" from="Button" to="." method="_on_button_pressed"]
 [connection signal="value_changed" from="HSlider" to="." method="_on_h_slider_value_changed"]

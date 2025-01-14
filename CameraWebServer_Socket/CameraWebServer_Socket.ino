@@ -266,7 +266,7 @@ void loop() {
   webSocket.loop();
 
   // write_pwm(LED_GPIO_NUM, x_speed);
-  Serial.println("x speed: " + String(x_speed) + " | y speed: " + String(y_speed));
+  //Serial.println("x speed: " + String(x_speed) + " | y speed: " + String(y_speed));
 }
 
 

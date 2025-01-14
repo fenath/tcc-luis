@@ -7,10 +7,29 @@ const PORT: int = 4242
 var URL := 'ws://' + IP_ADDRESS + ":" + str(PORT)
 var last_state
 
+var turn_speed: int = 300
+
+func input(delta: float):
+	if Input.is_action_pressed("ui_right"):
+		$Car.turn_size += turn_speed * delta
+	elif Input.is_action_pressed("ui_left"):
+		$Car.turn_size -= turn_speed * delta
+	else:
+		$Car.turn_size -= sign($Car.turn_size) * delta * turn_speed * 2
+	
+	if Input.is_action_pressed("ui_up"):
+		$Car.accelerate(delta)
+	elif Input.is_action_pressed("ui_down"):
+		$Car.pull_back(delta)
+	else:
+		$Car.decrease_speed(delta)
+	
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
 	# Call this in _process or _physics_process. Data transfer and state updates
 	# will only happen when calling this function.
+	input(delta)
+	$CarSpeed.text = str($Car.get_speed())
 	websocket.poll()
 
 	# get_ready_state() tells you what state the socket is in.
@@ -71,8 +90,6 @@ func _on_h_slider_value_changed(value: float) -> void:
 		floor_value = 0
 	$sliderValue.text = str(floor_value)
 	websocket.send_text('mvx+'+str(floor_value))
-	pass # Replace with function body.
-
 
 func _on_h_slider_2_value_changed(value: float) -> void:
 	var floor_value = floor(value)
