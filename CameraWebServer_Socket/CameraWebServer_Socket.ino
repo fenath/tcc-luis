@@ -1,8 +1,14 @@
 #include "esp_camera.h"
 #include <WiFi.h>
+#include <WiFiUdp.h>
 #define CONFIG_HTTPD_WS_SUPPORT
 
-#define PWM_FREQ 100
+#define PWM_FREQ 1
+#define MICRO_SECOND 1000000
+#define CHUNK_LENGTH 1460
+
+#define LEFT_MOTOR_PIN 0
+#define RIGHT_MOTOR_PIN 16
 
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
 // #define CAMERA_MODEL_WROVER_KIT // Has PSRAM
@@ -13,10 +19,18 @@
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-const char *ssid = "LIVE TIM_6034";//"Fernando's Galaxy A32";
-const char *password = "YyAHcsCf";//"ppzp0871";
+const char *ssid = "ALHN-7470";//"Fernando's Galaxy A32"; //
+const char *password = "x8Kgn5Rj5,";//"fernando.01";//
+
+const char *udpAddress = "192.168.1.255";
+const int udpPort = 4242;
+WiFiUDP udp;
+float fps = 0.0; // calculo de frames por segundo
 
 WebSocketsServer webSocket = WebSocketsServer(4242);
+
+void udpLoop();
+void sendPacketData(const char* buf, uint16_t len, uint16_t chunkLength);
 
 void startCameraServer();
 void setupLedFlash(int pin);
@@ -27,6 +41,11 @@ int extract_number(char * payload);
 int flash_status = 0;
 int x_speed = 0;
 int y_speed = 0;
+
+float right_power(int x_spd);
+float left_power(int x_spd);
+int motor_spd(float x_spd, float y_spd);
+void move_motors();
 
 // Called when receiving any WebSocket message
 void onWebSocketEvent(uint8_t num,
@@ -89,19 +108,13 @@ void onWebSocketEvent(uint8_t num,
         Serial.println("command received");
       } else if (String((char*)payload).startsWith("mvx"))
       {
-        // comando enviado: mvx+00, mvx+99, mvx+42, mvx-99
-        // mvx: nome do comando
-        // +,-: sentido do comando
-        // 00~99: intensidade do sinal
-        // FIXME: actually move x
-        // Por ora, vamos mandar o sinal para o flash via uma implementação de software-pwm
-        // a fim de enxergar a movimentação do flash
 
         // String nr_string = String((char*)payload).substring(4);
         int numero = extract_number((char*)payload);
 
-        Serial.println("moving x: " + String(numero));
+        //Serial.println("moving x: " + String(numero));
         x_speed = numero;
+        move_motors();
       } else if (String((char*)payload).startsWith("mvy"))
       {
         // mvy: nome do comando
@@ -109,8 +122,13 @@ void onWebSocketEvent(uint8_t num,
         // 00~99: intensidade do sinal
         // FIXME: actually move y
         int numero = extract_number((char*)payload);
-        Serial.println("moving y: " + String(numero));
+        // Serial.println("moving y: " + String(numero));
         y_speed = numero;
+        move_motors();
+      }else if (String((char*)payload).startsWith("fps"))
+      {
+        String fpsStr = String(fps, 2);
+        webSocket.sendTXT(num, fpsStr);
       } else
       {
         webSocket.sendTXT(num, payload);
@@ -236,36 +254,32 @@ void setup() {
   Serial.println("");
   Serial.println("WiFi connected");
 
-  startCameraServer();
+  //startCameraServer();
 
   Serial.println("trying to flash");
   pinMode(LED_GPIO_NUM, OUTPUT);
   digitalWrite(LED_GPIO_NUM, HIGH);
   delay(500);
   digitalWrite(LED_GPIO_NUM, LOW);
-  delay(500);
-  digitalWrite(LED_GPIO_NUM, HIGH);
-  delay(500);
-  digitalWrite(LED_GPIO_NUM, LOW);
-  delay(500);
-  digitalWrite(LED_GPIO_NUM, HIGH);
-  delay(500);
-  digitalWrite(LED_GPIO_NUM, LOW);
-  delay(500);
 
   Serial.print("Camera Ready! Use 'http://");
   Serial.print(WiFi.localIP());
   Serial.println("' to connect");
 
+  //pinMode(LEFT_MOTOR_PIN, OUTPUT);
+  //pinMode(RIGHT_MOTOR_PIN, OUTPUT);
+
   webSocket.begin();
   webSocket.onEvent(onWebSocketEvent);
+
+  udp.begin(udpPort);
 }
 
 void loop() {
   // Do nothing. Everything is done in another task by the web server
   webSocket.loop();
-
-  // write_pwm(LED_GPIO_NUM, x_speed);
+  udpLoop();
+  
   //Serial.println("x speed: " + String(x_speed) + " | y speed: " + String(y_speed));
 }
 
@@ -273,23 +287,36 @@ void loop() {
 void write_pwm(int pin, int value){
   static unsigned long last_micros = 0;
   static unsigned long i = 0;
-  unsigned long delta = micros() - last_micros;
+  static unsigned int pin_status = 0;
+
+  // Limitar o duty cycle entre 0% e 100%
+  if (value < 0) value = 0;
+  if (value > 100) value = 100;
   
-  // Frequência PWM fixada em 10.000 Hz (10 kHz)
-  unsigned long period = 1000000 / 500; 
-  int prop = (value + 1) * period / 100;
+  unsigned long now = micros(); 
+  unsigned long delta = now - last_micros;
+  
+  // periodo pwm (em microssegundos)= (10^6 (microssegundos)) / fequencia
+  unsigned long period = MICRO_SECOND / PWM_FREQ; 
+  int prop = (value) * period / 100;
   i++;
   if (delta >= period) {
-    last_micros = micros();
-    Serial.println(". Reseting after " + String(i) + " counts");
+    last_micros = now;
+    Serial.print(". Reseting after " + String(i) + " counts\n");
     i = 0;
   }
 
   if (delta < prop)
   {
-    digitalWrite(pin, HIGH);
+    if (pin_status == 0){
+      pin_status = 1;
+      digitalWrite(pin, HIGH);
+    }
   } else {
-    digitalWrite(pin, LOW);
+    if (pin_status == 1){
+      pin_status = 0;
+      digitalWrite(pin, LOW);
+    }
   } 
 }
 
@@ -297,4 +324,97 @@ int extract_number(char * payload) {
   String nr_string = String(payload).substring(3);
   int numero = nr_string.toInt();
   return numero;
+}
+
+
+void udpLoop() {
+  camera_fb_t *fb = NULL;
+
+  float alpha = 0.1; // Fator de suavização de frames
+
+  static unsigned long lastTime = 0;
+
+  if (lastTime == 0) {
+    lastTime = millis();
+  }
+
+  fb = esp_camera_fb_get();
+
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    // esp_camera_fb_return(fb);
+    return;
+  }
+
+  if (fb->format != PIXFORMAT_JPEG) {
+    Serial.println("PIXFORMAT_JPEG not implemented");
+    esp_camera_fb_return(fb);
+    return;
+  }
+
+  unsigned long frameTime = millis();
+  unsigned long deltaTime = frameTime - lastTime;
+
+  sendPacketData((const char*)fb->buf, fb->len, CHUNK_LENGTH);
+  esp_camera_fb_return(fb);
+
+  if (deltaTime > 0){
+    fps = alpha * (1000.0 / (frameTime - lastTime)) + (1 - alpha) * fps;
+  } else fps = 0;
+  
+  lastTime = frameTime;
+
+
+
+}
+
+void sendPacketData(const char* buf, uint16_t len, uint16_t chunkLength) {
+  uint8_t buffer[chunkLength];
+  size_t blen = sizeof(buffer);
+  size_t rest = len % blen;
+
+  for (uint8_t i = 0; i < len / blen; ++i) {
+    memcpy(buffer, buf + (i * blen), blen);
+    udp.beginPacket(udpAddress, udpPort);
+    udp.write(buffer, chunkLength);
+    udp.endPacket();
+  }
+
+  if (rest) {
+    memcpy(buffer, buf + (len - rest), rest);
+    udp.beginPacket(udpAddress, udpPort);
+    udp.write(buffer, rest);
+    udp.endPacket();
+  }
+}
+
+
+float left_power(int x_spd){
+  if (x_spd >= 0) return 1.0;
+  return 1.0 + float(x_spd)/100.0;
+}
+
+float right_power(int x_spd){
+  if (x_spd <= 0) return 1.0;
+  return 1.0 - float(x_spd)/100.0;
+}
+
+
+int motor_spd(float x_spd, float y_spd){
+  float calc = y_spd * x_spd * 100.0;
+  return int(calc);
+}
+
+
+void move_motors(){
+  float y_spd = float(y_speed) / 100.0;
+
+  int left_motor = motor_spd(left_power(x_speed), y_spd);
+  int right_motor = motor_spd(right_power(x_speed), y_spd);
+  //Serial.print("yspd: " +String(y_speed)+"| x-speed: "+String(x_speed)+"| right_pwr: "+String(right_power(x_speed))+"| left_pwr: "+String(left_power(x_speed))+"| L: "+String(left_motor) + "| R: " +String(right_motor)+"\n");
+  //Serial.print("power:"+String(left_motor)+","+String(right_motor)+"\n");
+  // Use snprintf for safe string formatting
+  char buffer[30];
+  snprintf(buffer, sizeof(buffer), "power:%d,%d\n", left_motor, right_motor);
+  Serial.print(buffer);
 }
