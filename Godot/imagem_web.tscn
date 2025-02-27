@@ -1,19 +1,59 @@
-[gd_scene load_steps=5 format=3 uid="uid://bcd4o74kqdsp3"]
+[gd_scene load_steps=12 format=3 uid="uid://bcd4o74kqdsp3"]
 
 [ext_resource type="Script" path="res://camera_stream_texture.gd" id="1_4gi5t"]
 [ext_resource type="Script" path="res://imagem_web.gd" id="1_x2def"]
 [ext_resource type="Texture2D" uid="uid://dwjnu4c6sm0cb" path="res://sports_car_top_view-800x442.png" id="3_mbsv5"]
 [ext_resource type="Script" path="res://car.gd" id="3_oyu73"]
+[ext_resource type="Script" path="res://udp_server_rect.gd" id="3_ve22p"]
+[ext_resource type="Script" path="res://tcp_server_rect.gd" id="4_n37r2"]
+[ext_resource type="Script" path="res://scripts/web_socket.gd" id="7_v8nan"]
+
+[sub_resource type="Gradient" id="Gradient_84dyv"]
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_ilo8w"]
+gradient = SubResource("Gradient_84dyv")
+
+[sub_resource type="Gradient" id="Gradient_xshnq"]
+colors = PackedColorArray(0.384314, 0.419608, 0, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_d2iqc"]
+gradient = SubResource("Gradient_xshnq")
 
 [node name="ImagemWeb" type="Node2D"]
 script = ExtResource("1_x2def")
 
 [node name="TextureRect" type="TextureRect" parent="."]
-offset_left = 279.0
-offset_top = 91.0
-offset_right = 919.0
-offset_bottom = 571.0
+offset_left = 23.0
+offset_top = 74.0
+offset_right = 561.0
+offset_bottom = 470.0
+texture = SubResource("GradientTexture1D_ilo8w")
 script = ExtResource("1_4gi5t")
+
+[node name="UDPServerRect" type="TextureRect" parent="."]
+offset_left = 709.0
+offset_top = 146.0
+offset_right = 1133.0
+offset_bottom = 476.0
+texture = SubResource("GradientTexture1D_d2iqc")
+script = ExtResource("3_ve22p")
+
+[node name="FrameRate" type="Label" parent="UDPServerRect"]
+layout_mode = 0
+offset_left = 105.0
+offset_top = 397.0
+offset_right = 239.0
+offset_bottom = 420.0
+text = "frames recebidos"
+
+[node name="TCPServerRect" type="TextureRect" parent="."]
+visible = false
+offset_left = 354.0
+offset_top = 297.0
+offset_right = 778.0
+offset_bottom = 627.0
+texture = SubResource("GradientTexture1D_d2iqc")
+script = ExtResource("4_n37r2")
 
 [node name="Label" type="Label" parent="."]
 offset_left = 21.0
@@ -56,8 +96,7 @@ offset_left = 133.0
 offset_top = 169.0
 offset_right = 340.0
 offset_bottom = 185.0
-min_value = -99.0
-max_value = 99.0
+min_value = -100.0
 
 [node name="sliderValue2" type="Label" parent="."]
 offset_left = 141.0
@@ -92,8 +131,7 @@ offset_left = 130.0
 offset_top = 271.0
 offset_right = 337.0
 offset_bottom = 287.0
-min_value = -99.0
-max_value = 99.0
+min_value = -100.0
 
 [node name="Car" type="Node2D" parent="."]
 position = Vector2(600, 500)
@@ -118,6 +156,19 @@ offset_right = 110.0
 offset_bottom = 30.0
 text = "asdkfja"
 
+[node name="carWebSocket" type="Node" parent="."]
+script = ExtResource("7_v8nan")
+
+[node name="reconnectTimer" type="Timer" parent="carWebSocket"]
+
+[node name="EspFPSLabel" type="Label" parent="."]
+offset_left = 816.0
+offset_top = 568.0
+offset_right = 902.0
+offset_bottom = 591.0
+text = "esp 32 fps: "
+
 [connection signal="pressed" from="Button" to="." method="_on_button_pressed"]
 [connection signal="value_changed" from="HSlider" to="." method="_on_h_slider_value_changed"]
 [connection signal="value_changed" from="HSlider2" to="." method="_on_h_slider_2_value_changed"]
+[connection signal="timeout" from="carWebSocket/reconnectTimer" to="carWebSocket" method="_on_reconnect_timer_timeout"]
