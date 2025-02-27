@@ -364,6 +364,36 @@ void udpLoop() {
   
   lastTime = frameTime;
 
+  // Recebendo comandos via UDP
+  int packetSize = udp.parsePacket();
+  if (packetSize) {
+    int len = udp.read(incomingPacket, 255);
+    if (len > 0) {
+      incomingPacket[len] = 0;
+      Serial.print("Comando recebido: ");
+      Serial.println(incomingPacket);
+
+      if (strncmp(incomingPacket, "power:", 6) == 0) {
+        int L = 0;
+        int R = 0;
+
+        if (sscanf(incomingPacket, "power:%d:%d", &L, &R) == 2) {
+          if (L >= 0 && L <= 100 && R >= 0 && R <= 100) {
+            Serial.print("Potencia L: ");
+            Serial.print(L);
+            Serial.print(", Potência R: ");
+            Serial.println(R);
+          } else {
+            Serial.println("Erro: Os valores de L e R devem estar entre 0 e 100");
+          }
+        } else {
+          Serial.println("Erro: Formato invalido para o comando power");
+        }
+      } else {
+        Serial.println("Erro: Comando inválido");
+      }
+    }
+  }
 
 
 }
