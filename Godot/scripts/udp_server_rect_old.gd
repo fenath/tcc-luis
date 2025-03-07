@@ -8,6 +8,9 @@ var byte_vector: PackedByteArray = PackedByteArray()
 var frame_in_progress := false
 var last_fps_time := Time.get_ticks_msec()
 var nb_frames := 0.0
+var ip_address: String = ''
+
+@onready var image_loader: PacketImageLoader = PacketImageLoader.new()
 
 func _ready() -> void:
 	var err = udp.bind(UDP_PORT)
@@ -19,6 +22,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	render_img()
+	display_ip_address()
 	
 	var current_time = Time.get_ticks_msec()
 	if current_time - last_fps_time >= 1000:  # Update every second
@@ -36,7 +40,7 @@ func calculate_delta_time():
 func create_texture_from_pool_byte_array(byte_array: PackedByteArray) -> ImageTexture:
 	var im: Image = Image.new()
 		
-	if byte_array.size() < 4 or not is_valid_jpg_header(byte_array):
+	if byte_array.size() < 4 or not image_loader.is_valid_jpg_header(byte_array):
 		print("Descartando frame inválido: tamanho ou cabeçalho incorreto")
 		return null
 
@@ -52,17 +56,11 @@ func create_texture_from_pool_byte_array(byte_array: PackedByteArray) -> ImageTe
 	var im_tx: ImageTexture = ImageTexture.create_from_image(im)
 	return im_tx
 
-func is_valid_jpg_header(data: PackedByteArray) -> bool:
-	if data.size() < 4:
-		return false
-	return (data[0] == 0xFF and data[1] == 0xD8 and data[2] == 0xFF and 
-			(data[3] == 0xE0 or data[3] == 0xDB))
-
 func render_img() -> void:
 	while udp.get_available_packet_count() > 0:
 		var pkt = udp.get_packet()
 		
-		if not frame_in_progress and is_valid_jpg_header(pkt):
+		if not frame_in_progress and image_loader.is_valid_jpg_header(pkt):
 			byte_vector = PackedByteArray()
 			frame_in_progress = true
 		
@@ -72,17 +70,21 @@ func render_img() -> void:
 			if pkt.size() >= 2 and pkt[-2] == 0xFF and pkt[-1] == 0xD9:
 				frame_in_progress = false
 				
-				if byte_vector.size() >= 4 and is_valid_jpg_header(byte_vector) and byte_vector[-2] == 0xFF and byte_vector[-1] == 0xD9:
+				if byte_vector.size() >= 4 and image_loader.is_valid_jpg_header(byte_vector) and byte_vector[-2] == 0xFF and byte_vector[-1] == 0xD9:
 					var imgtexture = create_texture_from_pool_byte_array(byte_vector)
 					if imgtexture != null:
 						texture = imgtexture
 						nb_frames += 1
+						ip_address = udp.get_packet_ip()
 				else:
 					frame_in_progress = false
 					byte_vector.clear()
 
 func display_frame_rate(fps: float) -> void:
 	$FrameRate.text = 'frames recebidos: ' + str(fps)
+	
+func display_ip_address() -> void:
+	$IPAddress.text = 'IP: ' +  ip_address
 
 
 func _exit_tree() -> void:

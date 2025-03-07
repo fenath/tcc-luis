@@ -19,8 +19,15 @@ void setup() {
 }
 
 void move(int left_power, int right_power) {
+
   left_power = constrain(left_power, -100, 100);
   right_power = constrain(right_power, -100, 100);
+  
+  // Debug
+  Serial.print("Moving: L:");
+  Serial.print(left_power);
+  Serial.print(" | R:");
+  Serial.println(right_power);
   
   int leftPWM = map(left_power, -100, 100, -255, 255);
   int rightPWM = map(right_power, -100, 100, -255, 255);
@@ -55,17 +62,18 @@ void loop() {
     // Verifica se o comando começa com "power:"
     Serial.print("[ARDUINO]: Received: "+ inputString);
     if (inputString.startsWith("power:")) {
+          
+      // Debug
+      Serial.print("Received power (cmd:'");
+      Serial.print(inputString);
+      Serial.println("')");
+
       int firstComma = inputString.indexOf(':');
-      int secondComma = inputString.indexOf(',', firstComma + 1);          
+      int secondComma = inputString.indexOf(':', firstComma + 1);          
 
       if (firstComma != -1 && secondComma != -1) {
         int left_power = inputString.substring(firstComma + 1, secondComma).toInt();
         int right_power = inputString.substring(secondComma + 1).toInt();
-          
-        //char buffer[30];
-        //snprintf(buffer, sizeof(buffer), "inputed: L: %d, R: %d\n", left_power, right_power);
-        //Serial.print(buffer);
-
         move(left_power, right_power);
       }
     }

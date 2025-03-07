@@ -1,19 +1,9 @@
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <WiFiUdp.h>
-#define CONFIG_HTTPD_WS_SUPPORT
-
-#define PWM_FREQ 1
-#define MICRO_SECOND 1000000
-#define CHUNK_LENGTH 1460
-
-#define LEFT_MOTOR_PIN 0
-#define RIGHT_MOTOR_PIN 16
-
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
-// #define CAMERA_MODEL_WROVER_KIT // Has PSRAM
 #include "camera_pins.h"
-#include <WebSocketsServer.h>
+#define CHUNK_LENGTH 1460
 
 
 // ===========================
@@ -24,18 +14,17 @@ const char *password = "x8Kgn5Rj5,";//"fernando.01";//
 
 const char *udpAddress = "192.168.1.255";
 const int udpPort = 4242;
+const int clientPort = 4241;
 WiFiUDP udp;
+char packetBuffer[255]; // Buffer que armazena mensagens recebidas via UDP
 float fps = 0.0; // calculo de frames por segundo
 
-WebSocketsServer webSocket = WebSocketsServer(4242);
-
 void udpLoop();
+void receiveUDPCommands();
+void broadcastImageUDP();
+void processUDPCommand(String command);
 void sendPacketData(const char* buf, uint16_t len, uint16_t chunkLength);
 
-void startCameraServer();
-void setupLedFlash(int pin);
-
-void write_pwm(int pin, int value);
 int extract_number(char * payload);
 
 int flash_status = 0;
@@ -47,111 +36,7 @@ float left_power(int x_spd);
 int motor_spd(float x_spd, float y_spd);
 void move_motors();
 
-// Called when receiving any WebSocket message
-void onWebSocketEvent(uint8_t num,
-                      WStype_t type,
-                      uint8_t * payload,
-                      size_t length) {
-
-  // Figure out the type of WebSocket event
-  switch(type) {
-
-    // Client has disconnected
-    case WStype_DISCONNECTED:
-      Serial.printf("[%u] Disconnected!\n", num);
-      break;
-
-    // New client has connected
-    case WStype_CONNECTED:
-      {
-        IPAddress ip = webSocket.remoteIP(num);
-        Serial.printf("[%u] Connection from ", num);
-        Serial.println(ip.toString());
-      }
-      break;
-
-    // Echo text message back to client
-    case WStype_TEXT:
-      Serial.printf("[%u] Text: %s\n", num, payload);
-      Serial.println((char*)payload);
-
-      if (String((char*)payload) == "capture")
-      {
-        Serial.println("Capture Command Received - capturing frame");
-
-        camera_fb_t * fb = NULL;
-        fb = esp_camera_fb_get(); // get image... part of work-around to get latest image
-        esp_camera_fb_return(fb); // return fb... part of work-around to get latest image
-        
-        fb = NULL;
-        fb = esp_camera_fb_get(); // get fresh image
-        size_t fbsize = fb->len;
-        Serial.println(fbsize);
-        Serial.println("Image captured. Returning frame buffer data.");
-        webSocket.sendBIN(num, fb->buf, fbsize);
-        esp_camera_fb_return(fb);
-        Serial.println("Done");
-      } else if (String((char*)payload) == "flash")
-      {
-        Serial.println("Flash command received - Toggling flash");
-        if (!flash_status) {
-          flash_status = 1;
-          digitalWrite(LED_GPIO_NUM, HIGH);
-          webSocket.sendTXT(num, "flash ON");
-        } else {
-          flash_status = 0;
-          digitalWrite(LED_GPIO_NUM, LOW);
-          webSocket.sendTXT(num, "flash OFF");
-        }
-      } else if (String((char*)payload) == "command")
-      {
-        Serial.println("command received");
-      } else if (String((char*)payload).startsWith("mvx"))
-      {
-
-        // String nr_string = String((char*)payload).substring(4);
-        int numero = extract_number((char*)payload);
-
-        //Serial.println("moving x: " + String(numero));
-        x_speed = numero;
-        move_motors();
-      } else if (String((char*)payload).startsWith("mvy"))
-      {
-        // mvy: nome do comando
-        // +,-: sentido do comando
-        // 00~99: intensidade do sinal
-        // FIXME: actually move y
-        int numero = extract_number((char*)payload);
-        // Serial.println("moving y: " + String(numero));
-        y_speed = numero;
-        move_motors();
-      }else if (String((char*)payload).startsWith("fps"))
-      {
-        String fpsStr = String(fps, 2);
-        webSocket.sendTXT(num, fpsStr);
-      } else
-      {
-        webSocket.sendTXT(num, payload);
-      }
-      break;
-
-    // For everything else: do nothing
-    case WStype_BIN:
-     // Serial.printf("[%u] get binary length: %u\n", num, length);
-     // hexdump(payload, length);
-
-      // send message to client
-      // webSocket.sendBIN(num, payload, length);
-     // break;
-    case WStype_ERROR:
-    case WStype_FRAGMENT_TEXT_START:
-    case WStype_FRAGMENT_BIN_START:
-    case WStype_FRAGMENT:
-    case WStype_FRAGMENT_FIN:
-    default:
-      break;
-  }
-}
+void setupLedFlash(int pin);
 
 void setup() {
   Serial.begin(115200);
@@ -178,7 +63,7 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_UXGA;
+  config.frame_size = FRAMESIZE_UXGA; //FRAMESIZE_SVGA;
   config.pixel_format = PIXFORMAT_JPEG;  // for streaming
   //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
@@ -254,70 +139,17 @@ void setup() {
   Serial.println("");
   Serial.println("WiFi connected");
 
-  //startCameraServer();
-
-  Serial.println("trying to flash");
   pinMode(LED_GPIO_NUM, OUTPUT);
   digitalWrite(LED_GPIO_NUM, HIGH);
   delay(500);
   digitalWrite(LED_GPIO_NUM, LOW);
 
-  Serial.print("Camera Ready! Use 'http://");
-  Serial.print(WiFi.localIP());
-  Serial.println("' to connect");
-
-  //pinMode(LEFT_MOTOR_PIN, OUTPUT);
-  //pinMode(RIGHT_MOTOR_PIN, OUTPUT);
-
-  webSocket.begin();
-  webSocket.onEvent(onWebSocketEvent);
-
-  udp.begin(udpPort);
+  udp.begin(clientPort);
+  Serial.println("Cliente udp iniciado!");
 }
 
 void loop() {
-  // Do nothing. Everything is done in another task by the web server
-  webSocket.loop();
   udpLoop();
-  
-  //Serial.println("x speed: " + String(x_speed) + " | y speed: " + String(y_speed));
-}
-
-
-void write_pwm(int pin, int value){
-  static unsigned long last_micros = 0;
-  static unsigned long i = 0;
-  static unsigned int pin_status = 0;
-
-  // Limitar o duty cycle entre 0% e 100%
-  if (value < 0) value = 0;
-  if (value > 100) value = 100;
-  
-  unsigned long now = micros(); 
-  unsigned long delta = now - last_micros;
-  
-  // periodo pwm (em microssegundos)= (10^6 (microssegundos)) / fequencia
-  unsigned long period = MICRO_SECOND / PWM_FREQ; 
-  int prop = (value) * period / 100;
-  i++;
-  if (delta >= period) {
-    last_micros = now;
-    Serial.print(". Reseting after " + String(i) + " counts\n");
-    i = 0;
-  }
-
-  if (delta < prop)
-  {
-    if (pin_status == 0){
-      pin_status = 1;
-      digitalWrite(pin, HIGH);
-    }
-  } else {
-    if (pin_status == 1){
-      pin_status = 0;
-      digitalWrite(pin, LOW);
-    }
-  } 
 }
 
 int extract_number(char * payload) {
@@ -326,8 +158,25 @@ int extract_number(char * payload) {
   return numero;
 }
 
-
 void udpLoop() {
+  
+  broadcastImageUDP();
+  // Recebendo comandos via UDP
+  receiveUDPCommands();
+
+}
+
+void broadcastImageUDP() {
+
+  static unsigned long lastImageTime = 0;
+
+  // setting frequence
+  if (millis() - lastImageTime <= 1000 / 60) {
+    return;
+  }
+
+  lastImageTime = millis();
+
   camera_fb_t *fb = NULL;
 
   float alpha = 0.1; // Fator de suavização de frames
@@ -342,7 +191,6 @@ void udpLoop() {
 
   if (!fb) {
     Serial.println("Camera capture failed");
-    // esp_camera_fb_return(fb);
     return;
   }
 
@@ -363,38 +211,60 @@ void udpLoop() {
   } else fps = 0;
   
   lastTime = frameTime;
+}
 
-  // Recebendo comandos via UDP
+void receiveUDPCommands() {
   int packetSize = udp.parsePacket();
   if (packetSize) {
-    int len = udp.read(incomingPacket, 255);
+    
+    int len = udp.read(packetBuffer, 255);
     if (len > 0) {
-      incomingPacket[len] = 0;
-      Serial.print("Comando recebido: ");
-      Serial.println(incomingPacket);
-
-      if (strncmp(incomingPacket, "power:", 6) == 0) {
-        int L = 0;
-        int R = 0;
-
-        if (sscanf(incomingPacket, "power:%d:%d", &L, &R) == 2) {
-          if (L >= 0 && L <= 100 && R >= 0 && R <= 100) {
-            Serial.print("Potencia L: ");
-            Serial.print(L);
-            Serial.print(", Potência R: ");
-            Serial.println(R);
-          } else {
-            Serial.println("Erro: Os valores de L e R devem estar entre 0 e 100");
-          }
-        } else {
-          Serial.println("Erro: Formato invalido para o comando power");
-        }
-      } else {
-        Serial.println("Erro: Comando inválido");
-      }
+      packetBuffer[len] = 0;
     }
+    processUDPCommand(packetBuffer);
+  }
+}
+
+void processUDPCommand(String command){
+  // TODO: Processar comandos que
+  // - 'fps': Retorna o valor de fps calculado aqui
+
+  Serial.println(" -------> Comando ----> " + command);
+
+  if (command == "fps") {
+    String response = "fps:" + String(fps, 2);
+    udp.beginPacket(udp.remoteIP(), udp.remotePort());
+    udp.print(response);
+    udp.endPacket();
+    Serial.println(response);
+    return;
   }
 
+  // - 'power:x:y': Envia este comando para serial, com os valores para cada eixo
+  if (command.startsWith("power")) {
+    
+    int firstColon = command.indexOf(':');
+    int secondColon = command.indexOf(':', firstColon + 1);
+    
+    if (secondColon > firstColon) {
+      String powerStr1 = command.substring(firstColon + 1, secondColon);
+      String powerStr2 = command.substring(secondColon + 1);
+
+      int powerLevel1 = powerStr1.toInt();
+      int powerLevel2 = powerStr2.toInt();
+
+      if (powerLevel1 < 0 || powerLevel1 > 100 || powerLevel2 < 0 || powerLevel2 > 100) {
+        Serial.print("Niveis de power precisam estar entre 0 e 100\n");
+        return;
+      }
+      Serial.printf("Níveis de potência atualizados: %d e %d\n", powerLevel1, powerLevel2);
+    } else {
+      Serial.printf("Comando power enviado incorretamente (%s) \n", command);
+    }
+    return;
+  }
+
+  Serial.printf("Comando não conhecido: %s\n", command);
 
 }
 
@@ -441,8 +311,6 @@ void move_motors(){
 
   int left_motor = motor_spd(left_power(x_speed), y_spd);
   int right_motor = motor_spd(right_power(x_speed), y_spd);
-  //Serial.print("yspd: " +String(y_speed)+"| x-speed: "+String(x_speed)+"| right_pwr: "+String(right_power(x_speed))+"| left_pwr: "+String(left_power(x_speed))+"| L: "+String(left_motor) + "| R: " +String(right_motor)+"\n");
-  //Serial.print("power:"+String(left_motor)+","+String(right_motor)+"\n");
   // Use snprintf for safe string formatting
   char buffer[30];
   snprintf(buffer, sizeof(buffer), "power:%d,%d\n", left_motor, right_motor);
