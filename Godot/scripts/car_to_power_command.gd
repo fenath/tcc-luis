@@ -24,3 +24,4 @@ func _process(delta: float) -> void:
 		power_left = left
 		power_right = right
 		power_changed.emit(power_left, power_right)
+		print("left: %d | right: %d" % [power_left, power_right])

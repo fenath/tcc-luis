@@ -7,10 +7,11 @@
 #define CAMERA_FREQ 40 // em HERTZ
 
 // Configurações da rede Wi-Fi
-const char *ssid = "ALHN-7470";//"Fernando's Galaxy A32"; //
-const char *password = "x8Kgn5Rj5,";//"fernando.01";//
+const char *ssid = "DBUG_Fernando_Leticia"; //"ALHN-7470";// "Fernando's Galaxy A32";
+const char *password = "batatafrita1";//"x8Kgn5Rj5,";//"fernando.01"
 
 WiFiUDP udp;
+char broadcastIP[16] = "192.168.255.255";  // IP do broadcast
 char serverIP[16] = "192.168.1.255";  // IP do Godot
 const int serverPort = 4242;  // Porta do servidor Godot
 const int localPort = 4211;   // Porta local do ESP32
@@ -30,9 +31,10 @@ void enviarBroadcastSignal();
 void atualizarIp(const char *newIp);
 
 void setup() {
+    Serial.begin(115200);
+    
     setupCamera();
 
-    Serial.begin(115200);
     
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
@@ -67,12 +69,12 @@ void setupCamera() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_SVGA; //FRAMESIZE_UXGA;
+  config.frame_size = FRAMESIZE_HD;// FRAMESIZE_UXGA;// FRAMESIZE_SVGA;//
   config.pixel_format = PIXFORMAT_JPEG;  // for streaming
   //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
   config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.jpeg_quality = 12;
+  config.jpeg_quality = 10;
   config.fb_count = 1;
 
   // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
@@ -162,6 +164,11 @@ void loop() {
   if (millis() - lastImageTime > 1000 / CAMERA_FREQ) {
     if (isBroadcasting) {
       enviarBroadcastSignal();
+      camera_config_t config;
+      // Serial.print("camera quality: ");
+      // Serial.println(config.frame_size);
+      // Serial.print("JPEG qlty: ");
+      // Serial.println(config.jpeg_quality);
     } else {
       enviarImagem();
       lastImageTime = millis();
@@ -203,6 +210,8 @@ void enviarBroadcastSignal() {
 }
 
 void atualizarIp(const char* newIp) {
+  
+  isBroadcasting = false;
 
   if (strcmp(serverIP, newIp) == 0){
     return;
@@ -213,7 +222,8 @@ void atualizarIp(const char* newIp) {
 
   Serial.print("IP atualizado para: ");
   Serial.println(serverIP);
-  isBroadcasting = false;
+
+  Serial.printf("novo ip: %s\n", newIp);
 }
 
 void enviarFPS() {

@@ -8,6 +8,8 @@ var esp_port = 4211  # Porta do ESP32
 @export var HANDSHAKE_INTERVAL: float = 1.0
 @onready var wait_handshake: float = HANDSHAKE_INTERVAL
 
+signal img_rendered
+
 var ping_cmd := ''
 
 enum PACKET_TYPE {
@@ -18,6 +20,7 @@ enum PACKET_TYPE {
 
 @onready var image_loader: PacketImageLoader = PacketImageLoader.new()
 var image_buffer := {}
+var last_image_length := 0
 var current_image_id: int = -1
 
 func _ready():
@@ -126,7 +129,6 @@ func combine_image_packets() -> PackedByteArray:
 		
 	return combined
 
-
 func render_img(pkt: PackedByteArray) -> void:
 	if ! image_loader.is_valid_jpg_header(pkt):
 		return
@@ -134,6 +136,7 @@ func render_img(pkt: PackedByteArray) -> void:
 	var imgtexture = image_loader.create_texture_from_pool_byte_array(pkt)
 	if imgtexture != null:
 		self.texture = imgtexture
+		img_rendered.emit()
 
 func enviar_comando(comando: String):
 	if esp_ip != "":

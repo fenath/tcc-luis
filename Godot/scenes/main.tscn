@@ -36,7 +36,7 @@ max_lines_visible = 6
 [node name="Car" type="CharacterBody2D" parent="."]
 position = Vector2(600, 500)
 script = ExtResource("5_vphul")
-max_speed = 100.0
+max_speed = 70.0
 max_turn_angle = 40.0
 
 [node name="CarSprite" type="Sprite2D" parent="Car"]
@@ -122,3 +122,37 @@ rotation = 1.5708
 scale = Vector2(0.15, 0.15)
 texture = ExtResource("6_mqmcm")
 offset = Vector2(100, 0)
+
+[node name="BtnTeste3Segundos" type="Button" parent="."]
+offset_left = 80.0
+offset_top = 315.0
+offset_right = 173.0
+offset_bottom = 373.0
+text = "acelerar 3s"
+
+[node name="btnPing" type="Button" parent="."]
+offset_left = 77.0
+offset_top = 395.0
+offset_right = 170.0
+offset_bottom = 453.0
+text = "ping"
+
+[node name="btnLenPic" type="Button" parent="."]
+offset_left = 76.0
+offset_top = 472.0
+offset_right = 169.0
+offset_bottom = 530.0
+text = "len(pic)"
+
+[node name="btnContarQuadros" type="Button" parent="."]
+offset_left = 196.0
+offset_top = 472.0
+offset_right = 289.0
+offset_bottom = 530.0
+text = "Contar Quadros
+(0)"
+
+[connection signal="pressed" from="BtnTeste3Segundos" to="." method="_on_button_pressed"]
+[connection signal="pressed" from="btnPing" to="." method="_on_btn_ping_pressed"]
+[connection signal="pressed" from="btnLenPic" to="." method="_on_btn_ping_2_pressed"]
+[connection signal="pressed" from="btnContarQuadros" to="." method="_on_btn_contar_quadros_pressed"]
