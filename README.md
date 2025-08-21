@@ -15,11 +15,15 @@ Há dois servidores, um responsável pelo stream do vídeo e um websocket respon
 - mv_x:+000: muda direção da roda (direita/esquerda) (IMPLEMENTAR)
 - mv_y:-000: muda velocidade do carro (frente/ré) (IMPLEMENTAR)
 
+- Novo: os comandos de movimento já sao mandados diretamente pelo godot relacionados às potências dos
+  motores diretamente (não é mais feito mvx:VALUE, agora mando um comando `power:L_MOTOR:R_MOTOR` responsável
+  pelo motor, evitando conversão no ESP32
+
 # Roadmap
 
 - [x] mvx, mvy
-- [ ] melhora na stream pelo godot (ao acessar pelo navegador (IP:81/stream) a transmissão é muito rápida,
+- [x] melhora na stream pelo godot (ao acessar pelo navegador (IP:81/stream) a transmissão é muito rápida,
       mas no godot estou usando request no momento, o que torna lento
 - [x] implementar PWM digital para poder usar valores variáveis e nao somente discretos para o robo
       (ex: acelerar 50%, virar 80% para esquerda)
-- [ ] Montar circuito do carro
+- [x] Montar circuito do carro
